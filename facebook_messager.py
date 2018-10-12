@@ -15,17 +15,23 @@ c = 0
 prev_time = time.time()
 prev_wait_time = 0
 additional_wait = 0
+paused = False
    
 
 # Subclass fbchat.Client and override required methods
 class EchoBot(Client):
     def onMessage(self, author_id, message_object, thread_id, thread_type, **kwargs):
         self.markAsDelivered(thread_id, message_object.uid)
-        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait
+        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait, paused
         log.info("{} from {} in {}".format(message_object, thread_id, thread_type.name))
         
         # If you're not the author, echo
-        if author_id != self.uid:
+        if author_id == self.uid:
+            if (message_object.text.lower() == "!pause") and (paused == False):
+                paused = True
+            elif (message_object.text.lower() == "!resume") and (paused == True):
+                paused = False
+        if (author_id != self.uid) and (paused == False):
             current_time = time.time()
             if time_since < prev_wait_time:
                 additional_wait = prev_wait_time - time_since
