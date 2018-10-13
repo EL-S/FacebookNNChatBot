@@ -29,8 +29,10 @@ class EchoBot(Client):
         if author_id == self.uid:
             if (message_object.text.lower() == "!pause") and (paused == False):
                 paused = True
+                self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
             elif (message_object.text.lower() == "!resume") and (paused == True):
                 paused = False
+                self.send(Message(text="resumed!"), thread_id=thread_id, thread_type=thread_type)
         if (author_id != self.uid) and (paused == False):
             current_time = time.time()
             if time_since < prev_wait_time:
