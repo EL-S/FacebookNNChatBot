@@ -16,24 +16,64 @@ prev_time = time.time()
 prev_wait_time = 0
 additional_wait = 0
 paused = False
-   
+paused_id = []
+resumed_id = []
+paused_thread = False
+status = False
+
 
 # Subclass fbchat.Client and override required methods
 class EchoBot(Client):
     def onMessage(self, author_id, message_object, thread_id, thread_type, **kwargs):
         self.markAsDelivered(thread_id, message_object.uid)
-        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait, paused
+        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait, paused, resumed_id, paused_id
         log.info("{} from {} in {}".format(message_object, thread_id, thread_type.name))
         
         # If you're not the author, echo
         if author_id == self.uid:
             if (message_object.text.lower() == "!pause") and (paused == False):
-                paused = True
-                self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
+                if thread_id not in paused_id:
+                    paused_id.append(thread_id)
+                    if thread_id in resumed_id:
+                        resumed_id.remove(thread_id)
+                    self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
             elif (message_object.text.lower() == "!resume") and (paused == True):
+                if thread_id not in paused_id:
+                    if thread_id in paused_id:
+                        paused_id.remove(thread_id)
+                    resumed_id.append(thread_id)
+                    self.send(Message(text="resumed!"), thread_id=thread_id, thread_type=thread_type)
+            elif (message_object.text.lower() == "!pause all"):
+                paused = True
+                self.send(Message(text="paused all!"), thread_id=thread_id, thread_type=thread_type)
+            elif (message_object.text.lower() == "!resume all"):
                 paused = False
-                self.send(Message(text="resumed!"), thread_id=thread_id, thread_type=thread_type)
-        if (author_id != self.uid) and (paused == False):
+                self.send(Message(text="resumed all!"), thread_id=thread_id, thread_type=thread_type)
+            elif (message_object.text.lower() == "!resume all f"):
+                paused = False
+                paused_id = []
+                self.send(Message(text="force resumed all!"), thread_id=thread_id, thread_type=thread_type)
+            elif (message_object.text.lower() == "!pause all f"):
+                paused = True
+                resumed_id = []
+                self.send(Message(text="force paused all!"), thread_id=thread_id, thread_type=thread_type)
+        if (paused == False) and (thread_id not in resumed_id): #fix this mess of code and replace with smaller code
+            status = True
+        elif (paused == True) and (thread_id in resumed_id):
+            status = False
+        if (paused == False) and (thread_id not in paused_id):
+            status = True
+        elif (paused == True) and (thread_id in paused_id):
+            status = False
+        elif (paused == False) and (thread_id in paused_id):
+            status = False
+        elif (thread_id not in resumed_id) and (thread_id not in paused_id):
+            if paused == True:
+                status = False
+            elif paused == False:
+                status = True
+        print(paused, paused_thread, status)
+        if (author_id != self.uid) and (status == True): #only processes the messages if not paused
             current_time = time.time()
             if time_since < prev_wait_time:
                 additional_wait = prev_wait_time - time_since
@@ -88,6 +128,6 @@ def grace_period_counter():
         print("Grace time over")
         grace_period = True
         c += 1
-  
-client = EchoBot("email", "password")
+
+client = EchoBot("", "")
 client.listen()
