@@ -5,6 +5,8 @@ from chatbotnn import *
 from random import randint
 import time
 import threading
+from bs4 import BeautifulSoup
+from urllib.request import Request, urlopen
 
 message_time_sent = False
 time_since = 120
@@ -31,14 +33,14 @@ class EchoBot(Client):
         
         # If you're not the author, echo
         if author_id == self.uid:
-            if (message_object.text.lower() == "!pause") and (paused == False):
+            if (message_object.text.lower() == "!pause"):
                 if thread_id not in paused_id:
-                    paused_id.append(thread_id)
                     if thread_id in resumed_id:
                         resumed_id.remove(thread_id)
+                    paused_id.append(thread_id)
                     self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
-            elif (message_object.text.lower() == "!resume") and (paused == True):
-                if thread_id not in paused_id:
+            elif (message_object.text.lower() == "!resume"):
+                if thread_id not in resumed_id:
                     if thread_id in paused_id:
                         paused_id.remove(thread_id)
                     resumed_id.append(thread_id)
@@ -57,21 +59,52 @@ class EchoBot(Client):
                 paused = True
                 resumed_id = []
                 self.send(Message(text="force paused all!"), thread_id=thread_id, thread_type=thread_type)
-        if (paused == False) and (thread_id not in resumed_id): #fix this mess of code and replace with smaller code
-            status = True
-        elif (paused == True) and (thread_id in resumed_id):
+            elif (message_object.text.lower() == "!status"):
+                resumed_list = ""
+                paused_list = ""
+                for x in resumed_id:
+                    thread_name = client.fetchThreadInfo(x)[x].name
+                    resumed_list += thread_name+"\n"
+                for y in paused_id:
+                    thread_name = client.fetchThreadInfo(y)[y].name
+                    paused_list += thread_name+"\n"
+                if resumed_list != "":
+                    resumed_list = "Resumed: " + resumed_list
+                if paused_list != "":
+                    paused_list = "Paused: " + paused_list
+                if paused == True:
+                    suffix = "\nGlobally Paused"
+                else:
+                    suffix = "\nGlobally Resumed"
+                self.send(Message(text=resumed_list+paused_list+suffix), thread_id=thread_id, thread_type=thread_type)
+            try:
+                if (message_object.text.lower().split(" ")[0] == "!yt"):
+                    youtube_link = "https://www.youtube.com/results?search_query="
+                    suffix = ""
+                    for x in message_object.text.lower().split(" "):
+                        if x != "!yt":
+                            suffix += "+"+x
+                    suffix = suffix[1:]
+                    url = youtube_link+suffix
+                    req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    page = urlopen(req)
+                    soup = BeautifulSoup(page, 'html.parser')
+                    youtube_vids = soup.findAll('a')
+                    first = True
+                    for i in youtube_vids: # super inefficient but I'm lazy
+                        if (i.get("href")[:9] == "/watch?v=") and (first != False):
+                            youtube_vid = "https://www.youtube.com"+i.get("href")
+                            first = False
+                    client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
+                    self.send(Message(text=youtube_vid), thread_id=thread_id, thread_type=thread_type)
+            except:
+                self.send(Message(text="ono there was a wiw fuckie wuckie uwu!!"), thread_id=thread_id, thread_type=thread_type)
+
+        if (thread_id in paused_id) or ((paused == True) and (thread_id not in resumed_id)):
             status = False
-        if (paused == False) and (thread_id not in paused_id):
-            status = True
-        elif (paused == True) and (thread_id in paused_id):
-            status = False
-        elif (paused == False) and (thread_id in paused_id):
-            status = False
-        elif (thread_id not in resumed_id) and (thread_id not in paused_id):
-            if paused == True:
-                status = False
-            elif paused == False:
-                status = True
+        else: #if it's not in paused or if it is globally paused and this thread is resumed
+            status = True #send message confirmed
+        
         print(paused, paused_thread, status)
         if (author_id != self.uid) and (status == True): #only processes the messages if not paused
             current_time = time.time()
