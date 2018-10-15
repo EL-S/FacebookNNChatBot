@@ -104,7 +104,7 @@ class EchoBot(Client):
                 status = False
             else: #if it's not in paused or if it is globally paused and this thread is resumed
                 status = True #send message confirmed
-            if message_object.text.lower()[0] == "!":
+            if message_object.text.lower()[0] == "!" and (author_id != self.uid):
                 try: #needs refactoring
                     if (message_object.text.lower().split(" ")[0] == "!yt"):
                         youtube_link = "https://www.youtube.com/results?search_query="
