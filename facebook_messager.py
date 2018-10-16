@@ -22,13 +22,14 @@ paused_id = []
 resumed_id = []
 paused_thread = False
 status = False
+typing_time = 0
 
 
 # Subclass fbchat.Client and override required methods
 class EchoBot(Client):
     def onMessage(self, author_id, message_object, thread_id, thread_type, **kwargs):
         self.markAsDelivered(thread_id, message_object.uid)
-        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait, paused, resumed_id, paused_id
+        global message_time_sent, time_since, grace_period, grace_time, grace_timestamp, c, prev_time, prev_wait_time, additional_wait, paused, resumed_id, paused_id, typing_time
         log.info("{} from {} in {}".format(message_object, thread_id, thread_type.name))
         
         # If you're not the author, echo
@@ -130,26 +131,29 @@ class EchoBot(Client):
             elif (author_id != self.uid) and (status == True): #only processes the messages if not paused
                 current_time = time.time()
                 if time_since < prev_wait_time:
-                    additional_wait = prev_wait_time - time_since
+                    additional_wait = prev_wait_time - time_since + typing_time
                 print("H:",message_object.text)
                 reply = chatbot_recieve(message_object.text)
+                lower_bound_sleep = len(reply)*139 #ms between each character on avg
+                upper_bound_sleep = int(lower_bound_sleep * 1.5)
+                typing_time = randint(lower_bound_sleep,upper_bound_sleep)/1000
                 if message_time_sent:
                     time_since = current_time - message_time_sent
                     print(time_since)
                 if grace_period == False:
                     wait_for = randint(1,2) + additional_wait
                     print(wait_for)
-                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply])
+                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
                     t.start()  # after wait_for seconds, the message will begin to be sent
                 elif time_since < 60:
                     wait_for = randint(3,5) + additional_wait
                     print(wait_for)
-                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply])
+                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
                     t.start()  # after wait_for seconds, the message will begin to be sent
                 else:
                     wait_for = randint(5,8) + additional_wait
                     print(wait_for)
-                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply])
+                    t = threading.Timer(wait_for, send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
                     t.start()  # after wait_for seconds, the message will begin to be sent
                 read_message = threading.Timer(int(wait_for/2), read_message_function, [self, author_id, message_object, thread_id, thread_type, reply])
                 print("Seen wait:",int(wait_for/2))
@@ -171,12 +175,10 @@ class EchoBot(Client):
 def read_message_function(self, author_id, message_object, thread_id, thread_type, reply, **kwargs):
     self.markAsRead(thread_id)
 
-def send_async_message(self, author_id, message_object, thread_id, thread_type, reply, **kwargs):
+def send_async_message(self, author_id, message_object, thread_id, thread_type, reply, typing_time, **kwargs):
     # Will set the typing status of the thread to `TYPING`
     client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
-    lower_bound_sleep = len(reply)*139 #ms between each character on avg
-    upper_bound_sleep = int(lower_bound_sleep * 1.5)
-    time.sleep(randint(lower_bound_sleep,upper_bound_sleep)/1000) #type for a realistic time
+    time.sleep(typing_time) #type for a realistic time
     self.send(Message(text=reply), thread_id=thread_id, thread_type=thread_type)
     message_time_sent = time.time()
 
