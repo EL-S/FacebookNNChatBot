@@ -25,7 +25,7 @@ class ChatBot(Client):
             admin = False
 
         #time.sleep(1) #there needs to be some delay otherwise it doesn't "seen" it
-        is_command, reply = self.check_for_command(author_id, message_object, thread_id, thread_type, **kwargs)
+        is_command, reply = self.check_for_command(author_id, message_object, thread_id, thread_type, admin, **kwargs)
         if (is_command) and (reply != ""):
             print(reply)
         elif (not is_command):
@@ -44,7 +44,7 @@ class ChatBot(Client):
         self.send(Message(text=reply), thread_id=thread_id, thread_type=thread_type)
         message_time_sent = time.time()
 
-    def check_for_command(self, author_id, message_object, thread_id, thread_type, **kwargs):
+    def check_for_command(self, author_id, message_object, thread_id, thread_type, admin, **kwargs):
         commands = ["status","test","yt", "pause", "resume"]
         message = message_object.text.lower()
         if message[0] == "!": #it's a command
@@ -54,7 +54,7 @@ class ChatBot(Client):
             if command in commands:
                 try:
                     func = eval(command) # Get the function using a string name, Make sure the function is defined globally!!
-                    value = func(self, author_id, message_object, thread_id, thread_type, arguments) #evaluates function called by sring and stores its return value
+                    value = func(self, author_id, message_object, thread_id, thread_type, admin, arguments) #evaluates function called by sring and stores its return value
                     return [True, ""]
                 except Exception as e:
                     print(e)
@@ -71,30 +71,33 @@ class ChatBot(Client):
             print("Grace time over")
             grace_period = True
             c += 1
-def test(self, author_id, message_object, thread_id, thread_type, arguments, **kwargs):
+def test(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     print("lmao")
 
-def status(self, author_id, message_object, thread_id, thread_type, arguments, **kwargs):
+def status(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     global resumed_id, paused_id, paused
-    resumed_list = ""
-    paused_list = ""
-    for x in resumed_id:
-        thread_name = client.fetchThreadInfo(x)[x].name
-        resumed_list += thread_name+"\n"
-    for y in paused_id:
-        thread_name = client.fetchThreadInfo(y)[y].name
-        paused_list += thread_name+"\n"
-    if resumed_list != "":
-        resumed_list = "Resumed: " + resumed_list
-    if paused_list != "":
-        paused_list = "Paused: " + paused_list
-    if paused == True:
-        suffix = "\nGlobally Paused"
+    if admin:
+        resumed_list = ""
+        paused_list = ""
+        for x in resumed_id:
+            thread_name = client.fetchThreadInfo(x)[x].name
+            resumed_list += thread_name+"\n"
+        for y in paused_id:
+            thread_name = client.fetchThreadInfo(y)[y].name
+            paused_list += thread_name+"\n"
+        if resumed_list != "":
+            resumed_list = "Resumed: " + resumed_list
+        if paused_list != "":
+            paused_list = "Paused: " + paused_list
+        if paused == True:
+            suffix = "\nGlobally Paused"
+        else:
+            suffix = "\nGlobally Resumed"
+        self.send(Message(text=resumed_list+paused_list+suffix), thread_id=thread_id, thread_type=thread_type)
     else:
-        suffix = "\nGlobally Resumed"
-    self.send(Message(text=resumed_list+paused_list+suffix), thread_id=thread_id, thread_type=thread_type)
+        self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
 
-def yt(self, author_id, message_object, thread_id, thread_type, arguments, **kwargs):
+def yt(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     youtube_link = "https://www.youtube.com/results?search_query="
     suffix = ""
     for x in arguments:
@@ -114,45 +117,51 @@ def yt(self, author_id, message_object, thread_id, thread_type, arguments, **kwa
     client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
     self.send(Message(text=youtube_vid), thread_id=thread_id, thread_type=thread_type)
 
-def pause(self, author_id, message_object, thread_id, thread_type, arguments, **kwargs):
+def pause(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     global paused_id, resumed_id, paused
-    try:
-        if arguments[0] == "all":
-            try:
-                if arguments[1] == "f":
+    if admin:
+        try:
+            if arguments[0] == "all":
+                try:
+                    if arguments[1] == "f":
+                        paused = True
+                        resumed_id = []
+                        paused_id = []
+                        self.send(Message(text="force paused all!"), thread_id=thread_id, thread_type=thread_type)
+                except:
                     paused = True
-                    resumed_id = []
-                    paused_id = []
-                    self.send(Message(text="force paused all!"), thread_id=thread_id, thread_type=thread_type)
-            except:
-                paused = True
-                self.send(Message(text="paused all!"), thread_id=thread_id, thread_type=thread_type)
-    except:
-        if thread_id not in paused_id:
-            if thread_id in resumed_id:
-                resumed_id.remove(thread_id)
-            paused_id.append(thread_id)
-            self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
+                    self.send(Message(text="paused all!"), thread_id=thread_id, thread_type=thread_type)
+        except:
+            if thread_id not in paused_id:
+                if thread_id in resumed_id:
+                    resumed_id.remove(thread_id)
+                paused_id.append(thread_id)
+                self.send(Message(text="paused!"), thread_id=thread_id, thread_type=thread_type)
+    else:
+        self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
     
-def resume(self, author_id, message_object, thread_id, thread_type, arguments, **kwargs):
+def resume(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     global paused_id, resumed_id, paused
-    try:
-        if arguments[0] == "all":
-            try:
-                if arguments[1] == "f":
+    if admin:
+        try:
+            if arguments[0] == "all":
+                try:
+                    if arguments[1] == "f":
+                        paused = False
+                        resumed_id = []
+                        paused_id = []
+                        self.send(Message(text="force resumed all!"), thread_id=thread_id, thread_type=thread_type)
+                except:
                     paused = False
-                    resumed_id = []
-                    paused_id = []
-                    self.send(Message(text="force resumed all!"), thread_id=thread_id, thread_type=thread_type)
-            except:
-                paused = False
-                self.send(Message(text="resumed all!"), thread_id=thread_id, thread_type=thread_type)
-    except:
-        if thread_id not in resumed_id:
-            if thread_id in paused_id:
-                paused_id.remove(thread_id)
-            resumed_id.append(thread_id)
-            self.send(Message(text="resumed!"), thread_id=thread_id, thread_type=thread_type)
+                    self.send(Message(text="resumed all!"), thread_id=thread_id, thread_type=thread_type)
+        except:
+            if thread_id not in resumed_id:
+                if thread_id in paused_id:
+                    paused_id.remove(thread_id)
+                resumed_id.append(thread_id)
+                self.send(Message(text="resumed!"), thread_id=thread_id, thread_type=thread_type)
+    else:
+        self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
 
 client = ChatBot("", "")
 client.listen()
