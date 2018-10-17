@@ -38,17 +38,18 @@ class ChatBot(Client):
         is_command, reply = self.check_for_command(author_id, message_object, thread_id, thread_type, admin, **kwargs)
         if (is_command) and (reply != ""):
             print(reply)
+            self.send_async_message(author_id, message_object, thread_id, thread_type, reply, typing_time, **kwargs)
         elif (not is_command):
             neuralnetworkresponse(self, author_id, message_object, thread_id, thread_type, admin, **kwargs)
             print("not a command, handle it as a message instead")
         else:
             print("it was a command and handled already")
-            self.read_message_function(self, author_id, message_object, thread_id, thread_type, reply, admin, **kwargs)
+            self.read_message_function(author_id, message_object, thread_id, thread_type, reply, admin, **kwargs)
 
     def read_message_function(self, author_id, message_object, thread_id, thread_type, reply, admin, **kwargs):
         self.markAsRead(thread_id)
 
-    def send_async_message(self, author_id, message_object, thread_id, thread_type, reply, typing_time, **kwargs):
+    def send_async_message(self, author_id, message_object, thread_id, thread_type, reply, typing_time=0, **kwargs):
         global message_time_sent
         # Will set the typing status of the thread to `TYPING`
         client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
@@ -66,7 +67,7 @@ class ChatBot(Client):
             if command in commands:
                 try:
                     func = eval(command) # Get the function using a string name, Make sure the function is defined globally!!
-                    value = func(self, author_id, message_object, thread_id, thread_type, admin, arguments) #evaluates function called by sring and stores its return value
+                    value = func(self, author_id, message_object, thread_id, thread_type, arguments, admin) #evaluates function called by sring and stores its return value
                     return [True, ""]
                 except Exception as e:
                     print(e)
@@ -105,7 +106,8 @@ def status(self, author_id, message_object, thread_id, thread_type, arguments, a
             suffix = "\nGlobally Paused"
         else:
             suffix = "\nGlobally Resumed"
-        self.send(Message(text=resumed_list+paused_list+suffix), thread_id=thread_id, thread_type=thread_type)
+        prefix = "Status:\n"
+        self.send(Message(text=prefix+resumed_list+paused_list+suffix), thread_id=thread_id, thread_type=thread_type)
     else:
         self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
 
