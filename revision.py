@@ -21,6 +21,8 @@ grace_timestamp = None
 additional_wait = 0
 grace_time = 0
 c = 0
+recent_message_time = {}
+recent_message_wait_time = {}
 
 # Subclass fbchat.Client and override required methods
 class ChatBot(Client):
@@ -50,12 +52,10 @@ class ChatBot(Client):
         self.markAsRead(thread_id)
 
     def send_async_message(self, author_id, message_object, thread_id, thread_type, reply, typing_time=0, **kwargs):
-        global message_time_sent
         # Will set the typing status of the thread to `TYPING`
         client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
         time.sleep(typing_time) #type for a realistic time, if it types for too long, I need to recall it because it times out
         self.send(Message(text=reply), thread_id=thread_id, thread_type=thread_type)
-        message_time_sent = time.time()
 
     def check_for_command(self, author_id, message_object, thread_id, thread_type, admin, **kwargs):
         commands = ["status","test","yt", "pause", "resume"]
@@ -178,7 +178,7 @@ def resume(self, author_id, message_object, thread_id, thread_type, arguments, a
         self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
 
 def neuralnetworkresponse(self, author_id, message_object, thread_id, thread_type, admin, **kwargs):
-    global paused_id, resumed_id, paused, prev_time, prev_wait_time, time_since, typing_time, message_time_sent, grace_period, grace_timestamp, additional_wait, wait_for
+    global paused_id, resumed_id, paused, recent_message_time, recent_message_wait_time
     if (thread_id in paused_id) or ((paused == True) and (thread_id not in resumed_id)):
         status = False
     else: #if it's not in paused or if it is globally paused and this thread is resumed
@@ -186,43 +186,40 @@ def neuralnetworkresponse(self, author_id, message_object, thread_id, thread_typ
     
     if (author_id != self.uid) and (status == True): #only processes the messages if not paused
         current_time = time.time()
-        if time_since < prev_wait_time: #handle all these variables on a user by user basic in a dict maybe
-            additional_wait = prev_wait_time - time_since + typing_time
+        #if time_since < prev_wait_time: #handle all these variables on a user by user basic in a dict maybe
+        #    additional_wait = prev_wait_time - time_since + typing_time
         print("H:",message_object.text)
         reply = chatbot_recieve(message_object.text)
-        lower_bound_sleep = len(reply)*139 #ms between each character on avg
-        upper_bound_sleep = int(lower_bound_sleep * 1.5)
-        typing_time = randint(lower_bound_sleep,upper_bound_sleep)/1000
-        if message_time_sent:
-            time_since = current_time - message_time_sent
-            print(time_since)
-        if grace_period == False:
-            wait_for = randint(1,2) + additional_wait
-            print(wait_for)
-            t = threading.Timer(wait_for, ChatBot.send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
-            t.start()  # after wait_for seconds, the message will begin to be sent
-        elif time_since < 60:
-            wait_for = randint(3,5) + additional_wait
-            print(wait_for)
-            t = threading.Timer(wait_for, ChatBot.send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
-            t.start()  # after wait_for seconds, the message will begin to be sent
-        else:
-            wait_for = randint(5,8) + additional_wait
-            print(wait_for)
-            t = threading.Timer(wait_for, ChatBot.send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
-            t.start()  # after wait_for seconds, the message will begin to be sent
-        read_message = threading.Timer(int(wait_for/2), ChatBot.read_message_function, [self, author_id, message_object, thread_id, thread_type, reply, admin])
-        print("Seen wait:",int(wait_for/2))
+        try:
+            time_since = current_time - recent_message_time[thread_id]
+            min_wait_time = recent_message_wait_time[thread_id]
+        except Exception as e:
+            #there is no current previous message
+            time_since = randint(20,25)
+            min_wait_time = randint(30,45) #this is first messaged recieved, so wait a bit
+        wait_for = int(min_wait_time - time_since)
+        if wait_for < 0:
+            #print(wait_for) #message already sent
+            wait_for = 0
+        #fine so far
+        lower_bound_sleep = len(reply)*139 #139 ms between each character on avg
+        upper_bound_sleep = int(lower_bound_sleep * 1.5) #gives the upper value for a slower type
+        typing_time = int(randint(lower_bound_sleep,upper_bound_sleep)/1000)
+        #problem?
+        if time_since < 0:
+            time_since = 1
+        wait_time = randint(int(wait_for),int(wait_for*1.5+time_since)) #calculates a random wait time based on how long since the last message was recieved
+        if wait_time > 60:
+            wait_time = randint(30,45)
+        recent_message_wait_time[thread_id] = wait_time + typing_time + wait_for #how long this message will take to send
+        new_wait_for = wait_time + wait_for + typing_time
+        recent_message_time[thread_id] = current_time + new_wait_for #when the message should have been recieved
+        t = threading.Timer(wait_time, ChatBot.send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
+        t.start()  # after wait_for seconds, the message will be sent
+        read_wait = int(wait_time/2)
+        print("Wait For:", wait_for, "Wait Time:", wait_time,"Seen wait:",read_wait, "Type Time:", typing_time)
+        read_message = threading.Timer(read_wait, ChatBot.read_message_function, [self, author_id, message_object, thread_id, thread_type, reply, admin])
         read_message.start()
-        grace_period = False
-        grace_time = randint(12,30)
-        grace_timestamp = time.time()
-        print("Grace_time:",grace_time)
-        count_down = threading.Timer(grace_time, ChatBot.grace_period_counter)
-        count_down.start()
-        c = 0
-        prev_time = time.time()
-        prev_wait_time = wait_for
 
 client = ChatBot("", "")
 client.listen()
