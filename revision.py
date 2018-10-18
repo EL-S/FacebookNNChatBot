@@ -195,9 +195,13 @@ def neuralnetworkresponse(self, author_id, message_object, thread_id, thread_typ
             min_wait_time = recent_message_wait_time[thread_id]
         except Exception as e:
             #there is no current previous message
-            time_since = randint(20,25)
-            min_wait_time = randint(30,45) #this is first messaged recieved, so wait a bit
-        wait_for = int(min_wait_time - time_since)
+            time_since = -1*randint(3,4)
+            min_wait_time = randint(10,13) #this is first messaged recieved, so wait a bit
+        if time_since < 0:
+            wait_for = int(-1*time_since)
+        else:
+            wait_for = int(min_wait_time)
+        print(min_wait_time,time_since)
         if wait_for < 0:
             #print(wait_for) #message already sent
             wait_for = 0
@@ -205,14 +209,16 @@ def neuralnetworkresponse(self, author_id, message_object, thread_id, thread_typ
         lower_bound_sleep = len(reply)*139 #139 ms between each character on avg
         upper_bound_sleep = int(lower_bound_sleep * 1.5) #gives the upper value for a slower type
         typing_time = int(randint(lower_bound_sleep,upper_bound_sleep)/1000)
+        if typing_time > 30:
+            typing_time = typing_time/2
+        if typing_time > 60:
+            typing_time = typing_time/2
         #problem?
-        if time_since < 0:
-            time_since = 1
-        wait_time = randint(int(wait_for),int(wait_for*1.5+time_since)) #calculates a random wait time based on how long since the last message was recieved
-        if wait_time > 60:
-            wait_time = randint(30,45)
-        recent_message_wait_time[thread_id] = wait_time + typing_time + wait_for #how long this message will take to send
-        new_wait_for = wait_time + wait_for + typing_time
+        if time_since < 0: #problem
+            time_since = 0
+        wait_time = randint(int(wait_for),int(wait_for+10+(time_since/2))) #calculates a random wait time based on how long since the last message was recieved
+        recent_message_wait_time[thread_id] = wait_time + typing_time #how long this message will take to send
+        new_wait_for = wait_time + typing_time
         recent_message_time[thread_id] = current_time + new_wait_for #when the message should have been recieved
         t = threading.Timer(wait_time, ChatBot.send_async_message, [self, author_id, message_object, thread_id, thread_type, reply, typing_time])
         t.start()  # after wait_for seconds, the message will be sent
