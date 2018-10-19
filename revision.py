@@ -8,6 +8,7 @@ import threading
 from bs4 import BeautifulSoup
 from urllib.request import Request, urlopen
 from urllib.parse import quote_plus
+from collections import OrderedDict
 
 resumed_id, paused_id = [], []
 paused = False
@@ -124,12 +125,25 @@ def yt(self, author_id, message_object, thread_id, thread_type, arguments, admin
     soup = BeautifulSoup(page, 'html.parser')
     youtube_vids = soup.findAll('a')
     first = True
+    c = 0
+    youtube_videos = []
     for i in youtube_vids: # super inefficient but I'm lazy
-        if (i.get("href")[:9] == "/watch?v=") and (first != False):
-            youtube_vid = "https://www.youtube.com"+i.get("href")
-            first = False
+        if (i.get("href")[:9] == "/watch?v="):
+            if c == 0:
+                first_video = "https://www.youtube.com"+i.get("href")
+            else:
+                youtube_videos.append("https://www.youtube.com"+i.get("href"))
+            c += 1
+    c = 0
+    youtube_videos = list(set(youtube_videos))
+    for i in youtube_videos:
+        if c == 0:
+            youtube_vid_message = "First Result:\n\n"+first_video+"\n\nMore Results:\n\n"+i+"\n\n"
+        elif c < 5:
+            youtube_vid_message += i+"\n\n"
+        c += 1
     client.setTypingStatus(TypingStatus.TYPING, thread_id=thread_id, thread_type=thread_type)
-    self.send(Message(text=youtube_vid), thread_id=thread_id, thread_type=thread_type)
+    self.send(Message(text=youtube_vid_message), thread_id=thread_id, thread_type=thread_type)
 
 def pause(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     global paused_id, resumed_id, paused
