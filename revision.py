@@ -24,15 +24,17 @@ grace_time = 0
 c = 0
 recent_message_time = {}
 recent_message_wait_time = {}
+admins = []
 
 # Subclass fbchat.Client and override required methods
 class ChatBot(Client):
     def onMessage(self, author_id, message_object, thread_id, thread_type, **kwargs):
         self.markAsDelivered(thread_id, message_object.uid)
+        global admins
         log.info("{} from {} in {}".format(message_object, thread_id, thread_type.name))
         
         # If you're the user, grant admin
-        if author_id == self.uid:
+        if (author_id == self.uid) or (thread_id in admins):
             admin = True
         else:
             admin = False
@@ -59,7 +61,7 @@ class ChatBot(Client):
         self.send(Message(text=reply), thread_id=thread_id, thread_type=thread_type)
 
     def check_for_command(self, author_id, message_object, thread_id, thread_type, admin, **kwargs):
-        commands = ["status","test","yt", "pause", "resume"]
+        commands = ["status","test","yt", "pause", "resume", "op"]
         message = message_object.text.lower()
         if message[0] == "!": #it's a command
             command = message.split(" ")[0][1:]
@@ -87,6 +89,28 @@ class ChatBot(Client):
             c += 1
 def test(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     print("lmao")
+
+def op(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
+    if admin:
+        global admins
+        try:
+            if arguments[0] == "remove":
+                if thread_id in admins:
+                    admins.remove(thread_id)
+                    self.send(Message(text="Revoked admin!"), thread_id=thread_id, thread_type=thread_type)
+                else:
+                    self.send(Message(text="No admin to remove!"), thread_id=thread_id, thread_type=thread_type)
+            else:
+                self.send(Message(text="Invalid Command!"), thread_id=thread_id, thread_type=thread_type)
+        except Exception as e:
+            if (thread_id not in admins):
+                admins.append(thread_id)
+                self.send(Message(text="Promoted to admin!"), thread_id=thread_id, thread_type=thread_type)
+            else:
+                self.send(Message(text="Already admin!"), thread_id=thread_id, thread_type=thread_type)
+        
+    else:
+        self.send(Message(text="You're not admin!"), thread_id=thread_id, thread_type=thread_type)
 
 def status(self, author_id, message_object, thread_id, thread_type, arguments, admin, **kwargs):
     global resumed_id, paused_id, paused
